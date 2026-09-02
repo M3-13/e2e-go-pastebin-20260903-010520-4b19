@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
@@ -24,19 +25,67 @@ func NewStore() *Store {
 	}
 }
 
+var ErrAlreadyExists = errors.New("paste with this id already exists")
+
 func (s *Store) Create(p Paste) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.pastes[p.ID]; ok {
+		return ErrAlreadyExists
+	}
+	s.pastes[p.ID] = p
 	return nil
 }
 
 func (s *Store) Get(id string) (Paste, bool) {
-	var zero Paste
-	return zero, false
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	p, ok := s.pastes[id]
+	if !ok {
+		var zero Paste
+		return zero, false
+	}
+	if expired(p) {
+		delete(s.pastes, id)
+		var zero Paste
+		return zero, false
+	}
+	return p, true
 }
 
 func (s *Store) List() []Paste {
-	return nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := make([]Paste, 0, len(s.pastes))
+	for id, p := range s.pastes {
+		if expired(p) {
+			delete(s.pastes, id)
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func (s *Store) Delete(id string) bool {
-	return false
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	p, ok := s.pastes[id]
+	if !ok {
+		return false
+	}
+	if expired(p) {
+		delete(s.pastes, id)
+		return false
+	}
+	delete(s.pastes, id)
+	return true
+}
+
+func expired(p Paste) bool {
+	return p.ExpiresAt != nil && time.Now().After(*p.ExpiresAt)
 }
