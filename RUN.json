@@ -1,0 +1,20 @@
+{
+  "runcontract": 1,
+  "services": [
+    {
+      "name": "pastebin",
+      "dir": ".",
+      "stack": "go",
+      "kind": "server",
+      "install": [["go", "mod", "download"]],
+      "build": [["go", "build", "-o", "pastebin", "."]],
+      "start": ["./pastebin"],
+      "port": 8080,
+      "health": { "path": "/healthz", "expect_status": [200] },
+      "env": {
+        "PASTEBIN_ADDR": { "dev": ":8080" },
+        "PASTEBIN_MAX_BODY_BYTES": { "dev": "1048576" }
+      }
+    }
+  ]
+}
